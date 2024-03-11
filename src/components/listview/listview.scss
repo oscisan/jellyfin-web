@@ -134,12 +134,12 @@
 }
 
 .listItemImage {
-    width: 4em;
+    width: 6em;
     height: 4em;
     min-width: 2.78em;
     min-height: 2.78em;
     background-repeat: no-repeat;
-    background-size: cover;
+    background-size: contain;
     flex-shrink: 0;
     background-position: center center;
     position: relative;

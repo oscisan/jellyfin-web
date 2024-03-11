@@ -14,9 +14,6 @@ export function getDisplayName(item, options = {}) {
     let name = ((item.Type === 'Program' || item.Type === 'Recording') && (item.IsSeries || item.EpisodeTitle) ? item.EpisodeTitle : item.Name) || '';
 
     if (item.Type === 'TvChannel') {
-        if (item.ChannelNumber) {
-            return item.ChannelNumber + ' ' + name;
-        }
         return name;
     }
     if (item.Type === 'Episode' && item.ParentIndexNumber === 0) {

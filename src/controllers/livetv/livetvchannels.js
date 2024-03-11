@@ -1,11 +1,10 @@
-import cardBuilder from '../../components/cardbuilder/cardBuilder';
 import imageLoader from '../../components/images/imageLoader';
-import libraryBrowser from '../../scripts/libraryBrowser';
 import loading from '../../components/loading/loading';
 import * as userSettings from '../../scripts/settings/userSettings';
 import Events from '../../utils/events.ts';
 
 import '../../elements/emby-itemscontainer/emby-itemscontainer';
+import listView from '../../components/listview/listview';
 
 export default function (view, params, tabContent) {
     function getPageData() {
@@ -13,33 +12,49 @@ export default function (view, params, tabContent) {
             pageData = {
                 query: {
                     StartIndex: 0,
-                    Fields: 'PrimaryImageAspectRatio'
+                    Fields: 'PrimaryImageAspectRatio',
+                    groupName: '|BLN| CROATIA'
                 }
             };
         }
 
         if (userSettings.libraryPageSize() > 0) {
-            pageData.query['Limit'] = userSettings.libraryPageSize();
+            pageData.query['Limit'] = 2000; //userSettings.libraryPageSize();
         }
 
         return pageData;
     }
 
     function getQuery() {
-        return getPageData().query;
+        const query = getPageData().query;
+        query.groupName = query.groupName.replaceAll('&amp;', '&');
+        return query;
     }
 
-    function getChannelsHtml(channels) {
-        return cardBuilder.getCardsHtml({
-            items: channels,
-            shape: 'square',
-            showTitle: true,
-            lazy: true,
-            cardLayout: true,
-            showDetailsMenu: true,
-            showCurrentProgram: true,
-            showCurrentProgramTime: true
+    function getChannelsHtml(channels, query) {
+        channels = channels.filter(e => {
+            return e.ChannelGroup === query.groupName;
         });
+
+        return listView.getListViewHtml({
+            items: channels
+        });
+    }
+
+    function getGroupHtml(groups, queryGroup) {
+        let html = '';
+        for (const group of groups) {
+            const group_button_active = group === queryGroup ? 'group-button-active' : '';
+            html +=
+                `<div class="vertical-list">
+                    <div class="padded-left">
+                        <a style="cursor:pointer" class="group-button ${group_button_active} button-flat button-flat-mini">
+                            <h2 style="display: inline-block; vertical-align: middle;margin: 0.4em 0">${group}</h2>
+                        </a>
+                    </div>
+                </div>`;
+        }
+        return html;
     }
 
     function renderChannels(context, result) {
@@ -69,21 +84,44 @@ export default function (view, params, tabContent) {
             });
         }
 
-        const query = getQuery();
+        function onGroupButton(e) {
+            if (isLoading) {
+                return;
+            }
 
-        for (const elem of context.querySelectorAll('.paging')) {
-            elem.innerHTML = libraryBrowser.getQueryPagingHtml({
-                startIndex: query.StartIndex,
-                limit: query.Limit,
-                totalRecordCount: result.TotalRecordCount,
-                showLimit: false,
-                updatePageSizeSetting: false,
-                filterButton: false
+            if (userSettings.libraryPageSize() > 0) {
+                query.StartIndex = Math.max(0, query.StartIndex - query.Limit);
+            }
+
+            const groupName = e.target.innerHTML;
+            query.groupName = groupName;
+
+            reloadItems(context).then(() => {
+                window.scrollTo(0, 0);
             });
         }
 
-        const html = getChannelsHtml(result.Items);
-        const elem = context.querySelector('#items');
+        const query = getQuery();
+
+        // unique groups
+        const groupsUnique = new Set();
+        for (const item of result.Items) {
+            if (item.ChannelGroup) {
+                groupsUnique.add(item.ChannelGroup);
+            }
+        }
+
+        // sort unique groups
+        const groups = Array.from(groupsUnique);
+        groups.sort();
+
+        const group_html = getGroupHtml(groups, query.groupName);
+        const group_elem = context.querySelector('#group');
+        group_elem.innerHTML = group_html;
+        imageLoader.lazyChildren(group_elem);
+
+        const html = getChannelsHtml(result.Items, query);
+        const elem = context.querySelector('#channels');
         elem.innerHTML = html;
         imageLoader.lazyChildren(elem);
         let i;
@@ -96,6 +134,10 @@ export default function (view, params, tabContent) {
 
         for (elems = context.querySelectorAll('.btnPreviousPage'), i = 0, length = elems.length; i < length; i++) {
             elems[i].addEventListener('click', onPreviousPageClick);
+        }
+
+        for (elems = context.querySelectorAll('.group-button'), i = 0, length = elems.length; i < length; i++) {
+            elems[i].addEventListener('click', onGroupButton);
         }
     }
 
